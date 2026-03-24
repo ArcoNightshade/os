@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LyonOS — Personal NixOS Flake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fragment+Mono:ital@0;1&family=Bebas+Neue&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #070a0d;
+  --bg2:       #0b0f13;
+  --surface:   #0f1419;
+  --surface2:  #141c24;
+  --border:    #1e2a35;
+  --border2:   #2a3d50;
+  --text:      #d0dce8;
+  --text2:     #607080;
+  --text3:     #2e4055;
+  --snow:      #9ccbf0;  /* nix snowflake blue */
+  --snow2:     #6aaad8;
+  --snow-dim:  rgba(156,203,240,0.08);
+  --snow-dim2: rgba(156,203,240,0.04);
+  --lime:      #c6f135;  /* accent from main site */
+  --red:       #e84060;
+  --amber:     #e8a020;
+  --mono:      'Fragment Mono', monospace;
+  --display:   'Bebas Neue', sans-serif;
+  --serif:     'DM Serif Display', serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* CURSOR */
+#cursor { position: fixed; width: 10px; height: 10px; background: var(--snow); transform: translate(-50%,-50%); pointer-events: none; z-index: 10000; mix-blend-mode: screen; transition: width .15s, height .15s; }
+#cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(156,203,240,0.3); transform: translate(-50%,-50%); pointer-events: none; z-index: 9999; transition: width .2s, height .2s; }
+body:has(a:hover) #cursor { width: 6px; height: 6px; }
+body:has(a:hover) #cursor-ring { width: 50px; height: 50px; border-color: rgba(156,203,240,0.6); }
+@media (hover: none) { body { cursor: auto; } #cursor, #cursor-ring { display: none; } }
+
+/* GRAIN */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.022; pointer-events: none; z-index: 9998;
+}
+
+/* ─── NAV ──────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 500;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(7,10,13,0.92); backdrop-filter: blur(16px);
+}
+
+.nav-left { display: flex; align-items: center; gap: 20px; }
+
+.nav-back {
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text3); text-decoration: none; transition: color .2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.nav-back:hover { color: var(--text2); }
+.nav-back::before { content: '←'; }
+
+.nav-sep { color: var(--border2); font-size: 14px; }
+
+.nav-wordmark {
+  font-family: var(--display); font-size: 20px; letter-spacing: 0.08em;
+  color: var(--text); text-decoration: none;
+}
+.nav-wordmark span { color: var(--snow); }
+
+.nav-right { display: flex; align-items: center; gap: 24px; }
+.nav-right a {
+  color: var(--text2); text-decoration: none; font-size: 11px;
+  letter-spacing: 0.1em; text-transform: uppercase; transition: color .2s;
+}
+.nav-right a:hover { color: var(--snow); }
+.nav-right .nav-gh {
+  border: 1px solid var(--border2); padding: 5px 14px;
+  transition: border-color .2s, color .2s;
+}
+.nav-right .nav-gh:hover { border-color: var(--snow); color: var(--snow); }
+
+/* HAMBURGER */
+.nav-hamburger {
+  display: none; flex-direction: column; justify-content: center;
+  gap: 5px; width: 36px; height: 36px; background: none;
+  border: 1px solid var(--border2); cursor: none; padding: 8px;
+}
+.nav-hamburger span { display: block; height: 1.5px; background: var(--text2); transition: all .25s; transform-origin: center; }
+.nav-hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+.nav-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.nav-hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+.nav-drawer {
+  display: none; position: fixed; top: 52px; left: 0; right: 0;
+  background: rgba(7,10,13,0.98); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border); z-index: 499;
+  padding: 8px 0 16px; opacity: 0; transform: translateY(-6px);
+  pointer-events: none; transition: opacity .22s ease, transform .22s ease;
+}
+.nav-drawer.open { opacity: 1; transform: translateY(0); pointer-events: all; }
+.nav-drawer a {
+  display: block; padding: 12px 24px; color: var(--text2);
+  text-decoration: none; font-size: 12px; letter-spacing: .1em;
+  text-transform: uppercase; border-bottom: 1px solid var(--border);
+  transition: color .15s, background .15s;
+}
+.nav-drawer a:last-child { border-bottom: none; }
+.nav-drawer a:hover { color: var(--snow); background: var(--surface); }
+
+/* ─── HERO ─────────────────────────────────────── */
+.hero {
+  min-height: 100svh;
+  padding-top: 52px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated background — concentric hexagonal-ish rings */
+.hero-bg {
+  position: absolute; inset: 0; overflow: hidden;
+}
+
+.hex-ring {
+  position: absolute;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  left: 72%; top: 50%;
+  animation: ringPulse 8s ease-in-out infinite;
+  opacity: 0;
+}
+.hex-ring:nth-child(1) { width: 200px; height: 200px; animation-delay: 0s; }
+.hex-ring:nth-child(2) { width: 380px; height: 380px; animation-delay: 1s; }
+.hex-ring:nth-child(3) { width: 560px; height: 560px; animation-delay: 2s; }
+.hex-ring:nth-child(4) { width: 740px; height: 740px; animation-delay: 3s; }
+.hex-ring:nth-child(5) { width: 920px; height: 920px; animation-delay: 4s; }
+.hex-ring:nth-child(6) { width: 1100px; height: 1100px; animation-delay: 5s; }
+
+.hero-bg-grid {
+  position: absolute; inset: -50%; width: 200%; height: 200%;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.18;
+  mask-image: radial-gradient(ellipse 90% 70% at 20% 50%, black 20%, transparent 75%);
+}
+
+/* SNOWFLAKE SVG decoration */
+.hero-snowflake {
+  position: absolute;
+  right: 6%; top: 50%;
+  transform: translateY(-50%);
+  width: min(420px, 40vw);
+  opacity: 0.06;
+  pointer-events: none;
+  animation: snowSpin 120s linear infinite;
+}
+
+/* HERO CONTENT */
+.hero-inner {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 60px 40px 40px;
+  position: relative; z-index: 2;
+}
+
+.hero-eyebrow {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--snow); margin-bottom: 28px;
+  opacity: 0; animation: riseIn .5s .1s forwards;
+}
+.hero-eyebrow-line { width: 28px; height: 1px; background: var(--snow); }
+
+.hero-title {
+  font-family: var(--display);
+  font-size: clamp(72px, 12vw, 160px);
+  line-height: 0.88; letter-spacing: -0.01em;
+  margin-bottom: 12px;
+  opacity: 0; animation: riseIn .6s .18s forwards;
+}
+
+.hero-title-sub {
+  font-family: var(--serif); font-style: italic;
+  font-size: clamp(18px, 2.5vw, 28px);
+  color: var(--text2); margin-bottom: 32px; line-height: 1.4;
+  opacity: 0; animation: riseIn .6s .28s forwards;
+}
+
+.hero-desc {
+  max-width: 480px; font-size: 13px; color: var(--text2);
+  line-height: 1.85; margin-bottom: 40px;
+  opacity: 0; animation: riseIn .5s .36s forwards;
+}
+
+.hero-desc strong { color: var(--text); font-weight: 400; }
+
+.hero-ctas {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  opacity: 0; animation: riseIn .5s .44s forwards;
+}
+
+.cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 22px; font-family: var(--mono); font-size: 12px;
+  letter-spacing: .06em; text-transform: uppercase;
+  text-decoration: none; transition: all .2s; cursor: none;
+}
+.cta-primary { background: var(--snow); color: var(--bg); font-weight: 400; }
+.cta-primary:hover { background: var(--snow2); }
+.cta-ghost { border: 1px solid var(--border2); color: var(--text2); }
+.cta-ghost:hover { border-color: var(--snow); color: var(--snow); }
+
+/* HERO BOTTOM — flake stats */
+.hero-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--border);
+  position: relative; z-index: 2;
+  opacity: 0; animation: riseIn .5s .54s forwards;
+}
+.hero-stat {
+  padding: 20px 28px; border-right: 1px solid var(--border);
+  position: relative; overflow: hidden;
+}
+.hero-stat:last-child { border-right: none; }
+.hero-stat::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: var(--snow);
+  transform: scaleX(0); transition: transform .4s;
+  transform-origin: left;
+}
+.hero-stat:hover::before { transform: scaleX(1); }
+
+.stat-val {
+  font-family: var(--display); font-size: 28px; color: var(--snow);
+  line-height: 1; margin-bottom: 5px;
+}
+.stat-label { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); }
+
+/* ─── QUICK START ───────────────────────────────── */
+.quickstart {
+  padding: 96px 40px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+}
+
+.section-eyebrow {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 20px;
+}
+.section-eyebrow::before { content: ''; width: 20px; height: 1px; background: var(--border2); }
+
+.section-title {
+  font-family: var(--display);
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1; letter-spacing: -.01em;
+  margin-bottom: 48px;
+}
+
+.section-title em {
+  font-family: var(--serif); font-style: italic;
+  color: var(--snow); font-size: .65em;
+}
+
+/* STEP LIST */
+.steps { display: flex; flex-direction: column; gap: 2px; }
+
+.step {
+  display: grid; grid-template-columns: 56px 1fr;
+  gap: 24px; background: var(--surface);
+  border: 1px solid transparent;
+  transition: border-color .2s, background .2s;
+}
+.step:hover { background: var(--surface2); border-color: var(--border); }
+
+.step-num {
+  padding: 24px 0 24px 24px;
+  font-family: var(--display); font-size: 28px;
+  color: var(--text3); line-height: 1;
+  user-select: none;
+}
+
+.step-body { padding: 20px 24px 20px 0; }
+
+.step-title {
+  font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text2); margin-bottom: 10px;
+}
+.step-title strong { color: var(--snow); font-weight: 400; }
+
+.step-cmd {
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 12px 16px; font-size: 12px; color: var(--text);
+  line-height: 1.7; position: relative; overflow-x: auto;
+  white-space: pre;
+}
+.step-cmd .dollar { color: var(--text3); user-select: none; }
+.step-cmd .cmd { color: var(--snow); }
+.step-cmd .arg { color: var(--amber); }
+.step-cmd .flag { color: var(--lime); }
+.step-cmd .cmt { color: var(--text3); font-style: italic; }
+
+.copy-btn {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text3); font-family: var(--mono); font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase;
+  padding: 3px 10px; cursor: none; transition: all .15s;
+}
+.copy-btn:hover { border-color: var(--snow); color: var(--snow); }
+.copy-btn.copied { border-color: var(--lime); color: var(--lime); }
+
+.step-note {
+  margin-top: 8px; font-size: 11px; color: var(--text3); line-height: 1.7;
+}
+.step-note a { color: var(--snow2); text-decoration: none; }
+.step-note a:hover { color: var(--snow); }
+
+/* ─── FLAKE STRUCTURE ───────────────────────────── */
+.structure { padding: 96px 40px; border-top: 1px solid var(--border); }
+
+.two-col {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start;
+}
+
+/* FILE TREE */
+.file-tree {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 24px; font-size: 12px; line-height: 2;
+}
+.ft-title {
+  font-size: 10px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 16px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ft-line { display: flex; align-items: center; gap: 8px; }
+.ft-indent { padding-left: 20px; }
+.ft-indent2 { padding-left: 40px; }
+.ft-dir { color: var(--snow2); }
+.ft-file { color: var(--text2); }
+.ft-file.highlight { color: var(--snow); }
+.ft-file.dim { color: var(--text3); }
+.ft-tree { color: var(--text3); user-select: none; font-size: 11px; }
+
+/* INPUTS TABLE */
+.inputs-list { display: flex; flex-direction: column; gap: 2px; }
+
+.input-row {
+  display: grid; grid-template-columns: 140px 1fr;
+  gap: 16px; background: var(--surface);
+  padding: 14px 20px; border-left: 2px solid transparent;
+  transition: all .2s;
+}
+.input-row:hover { background: var(--surface2); border-left-color: var(--snow); }
+.input-name { color: var(--snow); font-size: 12px; }
+.input-desc { color: var(--text2); font-size: 12px; line-height: 1.5; }
+.input-desc code { font-size: 11px; color: var(--lime); background: var(--surface2); padding: 1px 5px; border: 1px solid var(--border); }
+
+/* ─── PROFILES ──────────────────────────────────── */
+.profiles { padding: 96px 40px; background: var(--bg2); border-top: 1px solid var(--border); }
+
+.profiles-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 2px; background: var(--border); border: 1px solid var(--border);
+  margin-top: 0;
+}
+
+.profile-card {
+  background: var(--surface); padding: 36px;
+  position: relative; overflow: hidden;
+  transition: background .2s;
+}
+.profile-card:hover { background: var(--surface2); }
+
+.profile-card::after {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--snow), transparent);
+  transform: scaleX(0); transform-origin: left; transition: transform .35s;
+}
+.profile-card:hover::after { transform: scaleX(1); }
+
+.profile-icon {
+  font-size: 28px; margin-bottom: 20px; display: block;
+  filter: grayscale(1) brightness(0.7);
+  transition: filter .2s;
+}
+.profile-card:hover .profile-icon { filter: none; }
+
+.profile-name {
+  font-family: var(--display); font-size: 36px; letter-spacing: .02em;
+  color: var(--text); margin-bottom: 8px; line-height: 1;
+}
+.profile-sub {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 16px;
+}
+.profile-desc { font-size: 12px; color: var(--text2); line-height: 1.7; }
+
+.profile-cmd {
+  margin-top: 20px; background: var(--bg); border: 1px solid var(--border);
+  padding: 10px 14px; font-size: 11px; color: var(--text3); overflow-x: auto; white-space: nowrap;
+}
+.profile-cmd .snow { color: var(--snow); }
+
+/* ─── COMMANDS ──────────────────────────────────── */
+.commands { padding: 96px 40px; border-top: 1px solid var(--border); }
+
+.cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--border); border: 1px solid var(--border); }
+
+.cmd-card { background: var(--surface); padding: 28px 32px; transition: background .2s; }
+.cmd-card:hover { background: var(--surface2); }
+
+.cmd-card-label {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 10px;
+}
+.cmd-card-label.snow { color: var(--snow); }
+.cmd-card-label.lime { color: var(--lime); }
+.cmd-card-label.amber { color: var(--amber); }
+
+.cmd-line {
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 11px 14px; font-size: 12px; line-height: 1;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+  overflow-x: auto; white-space: nowrap;
+}
+.cmd-line:last-of-type { margin-bottom: 12px; }
+.cmd-dollar { color: var(--text3); }
+.cmd-main { color: var(--snow); }
+.cmd-sub { color: var(--text); }
+.cmd-opt { color: var(--amber); }
+.cmd-extra { color: var(--lime); }
+
+.cmd-note { font-size: 11px; color: var(--text3); line-height: 1.6; }
+
+/* ─── LINKS ─────────────────────────────────────── */
+.links-strip {
+  border-top: 1px solid var(--border);
+  padding: 64px 40px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+  background: var(--border);
+}
+
+.link-card {
+  background: var(--bg2); padding: 28px 32px;
+  text-decoration: none; display: block;
+  transition: background .2s;
+  position: relative; overflow: hidden;
+}
+.link-card::after {
+  content: '↗'; position: absolute; top: 24px; right: 24px;
+  font-size: 16px; color: var(--text3); transition: color .2s, transform .2s;
+}
+.link-card:hover { background: var(--surface); }
+.link-card:hover::after { color: var(--snow); transform: translate(2px,-2px); }
+
+.link-card-title { font-size: 13px; color: var(--text); margin-bottom: 6px; transition: color .2s; }
+.link-card:hover .link-card-title { color: var(--snow); }
+.link-card-desc { font-size: 11px; color: var(--text3); line-height: 1.6; }
+
+/* ─── FOOTER ─────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border); padding: 40px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+  background: var(--bg2);
+}
+.footer-brand .wm { font-family: var(--display); font-size: 22px; letter-spacing: .08em; color: var(--text); }
+.footer-brand .wm span { color: var(--snow); }
+.footer-brand p { font-size: 11px; color: var(--text3); margin-top: 6px; max-width: 260px; line-height: 1.7; }
+.footer-right { text-align: right; }
+.footer-right a { display: block; font-size: 12px; color: var(--text2); text-decoration: none; margin-bottom: 8px; transition: color .2s; letter-spacing: .04em; }
+.footer-right a:hover { color: var(--snow); }
+.footer-right a:last-child { margin-bottom: 0; }
+.footer-bottom {
+  border-top: 1px solid var(--border); padding: 14px 40px;
+  display: flex; justify-content: space-between; background: var(--bg2);
+}
+.footer-bottom p { font-size: 10px; color: var(--text3); letter-spacing: .06em; }
+
+/* ─── ANIMATIONS ─────────────────────────────────── */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ringPulse {
+  0%   { opacity: 0;    transform: translate(-50%,-50%) scale(0.8); }
+  20%  { opacity: 0.35; }
+  80%  { opacity: 0;    transform: translate(-50%,-50%) scale(1.15); }
+  100% { opacity: 0; }
+}
+@keyframes snowSpin { from { transform: translateY(-50%) rotate(0); } to { transform: translateY(-50%) rotate(360deg); } }
+
+/* ─── RESPONSIVE ─────────────────────────────────── */
+@media (max-width: 768px) {
+  nav { padding: 0 20px; }
+  .nav-right { display: none; }
+  .nav-hamburger { display: flex; }
+  .nav-drawer { display: block; }
+  .nav-sep { display: none; }
+
+  .hero-inner { padding: 40px 20px 32px; }
+  .hero-snowflake { opacity: 0.04; width: 200px; right: -20px; }
+  .hex-ring { left: 85%; }
+  .hero-stats { grid-template-columns: 1fr 1fr; }
+  .hero-stat { padding: 16px 20px; }
+  .stat-val { font-size: 22px; }
+
+  .quickstart, .structure, .profiles, .commands { padding: 64px 20px; }
+
+  .two-col { grid-template-columns: 1fr; gap: 32px; }
+  .profiles-grid { grid-template-columns: 1fr; }
+  .cmd-grid { grid-template-columns: 1fr; }
+  .links-strip { grid-template-columns: 1fr; gap: 2px; padding: 40px 20px; }
+
+  .step { grid-template-columns: 40px 1fr; gap: 12px; }
+  .step-num { padding-left: 16px; font-size: 22px; }
+
+  footer { flex-direction: column; align-items: flex-start; padding: 32px 20px; }
+  .footer-right { text-align: left; }
+  .footer-bottom { padding: 14px 20px; flex-direction: column; gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-left">
+    <a href="https://lyonos.dev" class="nav-back">lyonos.dev</a>
+    <span class="nav-sep">/</span>
+    <a href="/" class="nav-wordmark">Lyon<span>OS</span></a>
+  </div>
+  <div class="nav-right">
+    <a href="#quickstart">Quick Start</a>
+    <a href="#profiles">Profiles</a>
+    <a href="#commands">Commands</a>
+    <a href="https://github.com/ArcoNightshade/LyonOS-V2" target="_blank" class="nav-gh">GitHub ↗</a>
+  </div>
+  <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<div class="nav-drawer" id="navDrawer">
+  <a href="#quickstart">Quick Start</a>
+  <a href="#profiles">Profiles</a>
+  <a href="#commands">Commands</a>
+  <a href="https://github.com/ArcoNightshade/LyonOS-V2" target="_blank">GitHub ↗</a>
+  <a href="https://lyonos.dev">← lyonos.dev</a>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-bg-grid"></div>
+    <div class="hex-ring"></div>
+    <div class="hex-ring"></div>
+    <div class="hex-ring"></div>
+    <div class="hex-ring"></div>
+    <div class="hex-ring"></div>
+    <div class="hex-ring"></div>
+  </div>
+
+  <!-- Nix snowflake SVG -->
+  <svg class="hero-snowflake" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="#9ccbf0" stroke-width="1.5" stroke-linecap="round">
+      <!-- Main axes -->
+      <line x1="50" y1="5" x2="50" y2="95"/>
+      <line x1="5" y1="50" x2="95" y2="50"/>
+      <line x1="14.6" y1="14.6" x2="85.4" y2="85.4"/>
+      <line x1="85.4" y1="14.6" x2="14.6" y2="85.4"/>
+      <!-- Branches on vertical -->
+      <line x1="50" y1="25" x2="40" y2="15"/> <line x1="50" y1="25" x2="60" y2="15"/>
+      <line x1="50" y1="75" x2="40" y2="85"/> <line x1="50" y1="75" x2="60" y2="85"/>
+      <!-- Branches on horizontal -->
+      <line x1="25" y1="50" x2="15" y2="40"/> <line x1="25" y1="50" x2="15" y2="60"/>
+      <line x1="75" y1="50" x2="85" y2="40"/> <line x1="75" y1="50" x2="85" y2="60"/>
+      <!-- Center -->
+      <circle cx="50" cy="50" r="4" fill="#9ccbf0" stroke="none"/>
+    </g>
+  </svg>
+
+  <div class="hero-inner">
+    <div class="hero-eyebrow">
+      <div class="hero-eyebrow-line"></div>
+      Personal NixOS Flake — v2
+    </div>
+
+    <div class="hero-title">LYON<wbr>OS</div>
+
+    <div class="hero-title-sub">Now fully reproducible.</div>
+
+    <p class="hero-desc">
+      A personal <strong>NixOS flake</strong> for laptop, desktop, and VMs. Three profiles, declarative configuration, <strong>Limine bootloader</strong> with custom branding, chaotic-nyx overlay, home-manager, and everything else needed for a daily driver system — committed to git and rebuilt from scratch any time.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#quickstart" class="cta cta-primary">Quick Start</a>
+      <a href="https://github.com/ArcoNightshade/LyonOS-V2" target="_blank" class="cta cta-ghost">View on GitHub ↗</a>
+    </div>
+  </div>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="stat-val">3</div>
+      <div class="stat-label">Profiles</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-val">25.11</div>
+      <div class="stat-label">nixpkgs channel</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-val">nyx</div>
+      <div class="stat-label">chaotic overlay</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-val">177</div>
+      <div class="stat-label">commits</div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK START -->
+<section class="quickstart" id="quickstart">
+  <div class="section-eyebrow">Setup</div>
+  <h2 class="section-title">Quick <em>Start</em></h2>
+
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <div class="step-title">Clone the flake</div>
+        <div class="step-cmd" id="cmd1">
+<span class="dollar">$ </span><span class="cmd">git clone</span> <span class="arg">https://github.com/ArcoNightshade/LyonOS-V2</span> <span class="flag">~/.lyonos</span>
+<span class="dollar">$ </span><span class="cmd">rm -rf</span> <span class="flag">~/.lyonos/.git</span>
+        <button class="copy-btn" data-copy="git clone https://github.com/ArcoNightshade/LyonOS-V2 ~/.lyonos && rm -rf ~/.lyonos/.git">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <div class="step-title">Copy hardware config</div>
+        <div class="step-cmd" id="cmd2">
+<span class="dollar">$ </span><span class="cmd">cp</span> <span class="arg">/etc/nixos/hardware-configuration.nix</span> <span class="flag">~/.lyonos/profile/workstation/hardware.nix</span>
+        <button class="copy-btn" data-copy="cp /etc/nixos/hardware-configuration.nix ~/.lyonos/profile/workstation/hardware.nix">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <div class="step-title">Set username in <strong>flake.nix</strong></div>
+        <div class="step-cmd" id="cmd3">
+<span class="dollar">$ </span><span class="cmd">nano</span> <span class="flag">~/.lyonos/flake.nix</span>  <span class="cmt"># set account.name and timeZone</span>
+        <button class="copy-btn" data-copy="nano ~/.lyonos/flake.nix">copy</button></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-body">
+        <div class="step-title">Configure drive &amp; password in <strong>compose.nix</strong></div>
+        <div class="step-cmd" id="cmd4">
+<span class="dollar">$ </span><span class="cmd">mkpasswd</span> <span class="arg">-m sha-512</span> <span class="flag">&lt;password&gt;</span>  <span class="cmt"># generate hash</span>
+<span class="dollar">$ </span><span class="cmd">nano</span> <span class="flag">~/.lyonos/compose.nix</span>   <span class="cmt"># paste hash, set drive type</span>
+        <button class="copy-btn" data-copy="nano ~/.lyonos/compose.nix">copy</button></div>
+        <div class="step-note">Drive options at the bottom: <code>/dev/vda</code> (VM), <code>/dev/sda</code> (HDD), <code>/dev/nvme0n1</code> (SSD — default)</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">05</div>
+      <div class="step-body">
+        <div class="step-title">Build &amp; boot</div>
+        <div class="step-cmd" id="cmd5">
+<span class="dollar">$ </span><span class="cmd">sudo nixos-rebuild</span> <span class="arg">boot</span> <span class="flag">--flake ~/.lyonos#workstation</span>
+        <button class="copy-btn" data-copy="sudo nixos-rebuild boot --flake ~/.lyonos#workstation">copy</button></div>
+        <div class="step-note">Use <code>boot</code> to build next generation and apply on reboot. Use <code>switch</code> to apply immediately.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- STRUCTURE -->
+<section class="structure" id="structure">
+  <div class="section-eyebrow">Repository</div>
+  <h2 class="section-title">Flake <em>Structure</em></h2>
+
+  <div class="two-col">
+    <div>
+      <div class="file-tree">
+        <div class="ft-title">LyonOS-V2/</div>
+        <div class="ft-line"><span class="ft-tree">├─</span><span class="ft-file highlight">flake.nix</span></div>
+        <div class="ft-line"><span class="ft-tree">├─</span><span class="ft-file highlight">compose.nix</span></div>
+        <div class="ft-line"><span class="ft-tree">├─</span><span class="ft-file dim">flake.lock</span></div>
+        <div class="ft-line"><span class="ft-tree">├─</span><span class="ft-dir">modules/</span></div>
+        <div class="ft-line ft-indent"><span class="ft-tree">└─</span><span class="ft-dir">desktop/</span></div>
+        <div class="ft-line ft-indent2"><span class="ft-tree">└─</span><span class="ft-dir">wallpapers/</span></div>
+        <div class="ft-line"><span class="ft-tree">├─</span><span class="ft-dir">profile/</span></div>
+        <div class="ft-line ft-indent"><span class="ft-tree">├─</span><span class="ft-dir">workstation/</span></div>
+        <div class="ft-line ft-indent2"><span class="ft-tree">├─</span><span class="ft-file">hardware.nix</span></div>
+        <div class="ft-line ft-indent2"><span class="ft-tree">└─</span><span class="ft-file">configuration.nix</span></div>
+        <div class="ft-line ft-indent"><span class="ft-tree">├─</span><span class="ft-dir">desktop/</span></div>
+        <div class="ft-line ft-indent"><span class="ft-tree">└─</span><span class="ft-dir">iso/</span></div>
+        <div class="ft-line"><span class="ft-tree">└─</span><span class="ft-dir">waybar/</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border);">Flake Inputs</div>
+      <div class="inputs-list">
+        <div class="input-row">
+          <div class="input-name">nixpkgs</div>
+          <div class="input-desc">Stable channel — <code>nixos-25.11</code></div>
+        </div>
+        <div class="input-row">
+          <div class="input-name">nixpkgs-unstable</div>
+          <div class="input-desc">Unstable channel for cutting-edge packages</div>
+        </div>
+        <div class="input-row">
+          <div class="input-name">home-manager</div>
+          <div class="input-desc">User environment management — <code>release-25.11</code>, follows nixpkgs</div>
+        </div>
+        <div class="input-row">
+          <div class="input-name">chaotic-nyx</div>
+          <div class="input-desc">Binary cache + overlay for packages not in nixpkgs. Provides <code>nyx-cache</code>, <code>nyx-overlay</code>, <code>nyx-registry</code></div>
+        </div>
+      </div>
+
+      <div style="margin-top:32px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border);">Compose Settings</div>
+      <div class="inputs-list">
+        <div class="input-row">
+          <div class="input-name">Bootloader</div>
+          <div class="input-desc">Limine — UEFI, custom wallpaper, <code>Welcome to LyonOS!</code> branding, 1920×1080</div>
+        </div>
+        <div class="input-row">
+          <div class="input-name">Memory</div>
+          <div class="input-desc">zram with 2× RAM compression. Adjustable to 1× if issues arise</div>
+        </div>
+        <div class="input-row">
+          <div class="input-name">Power</div>
+          <div class="input-desc">power-profiles-daemon, upower with hibernate at 5%, thermald, powersave governor</div>
+        </div>
+        <div class="input-row">
+          <div class="input-name">nh</div>
+          <div class="input-desc">NixOS helper — auto-clean generations older than 4d, keep 3. Sets <code>NH_OS_FLAKE</code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROFILES -->
+<section class="profiles" id="profiles">
+  <div class="section-eyebrow">Targets</div>
+  <h2 class="section-title">System <em>Profiles</em></h2>
+
+  <div class="profiles-grid">
+    <div class="profile-card">
+      <span class="profile-icon">💻</span>
+      <div class="profile-name">WORKSTATION</div>
+      <div class="profile-sub">Primary laptop / daily driver</div>
+      <div class="profile-desc">The main profile. Hardware config lives at <code>profile/workstation/hardware.nix</code> — replace with your own from <code>/etc/nixos</code>.</div>
+      <div class="profile-cmd">
+        <span class="snow">sudo nixos-rebuild switch</span> --flake ~/.lyonos<span class="snow">#workstation</span>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <span class="profile-icon">🖥</span>
+      <div class="profile-name">DESKTOP</div>
+      <div class="profile-sub">Desktop machine</div>
+      <div class="profile-desc">Separate hardware profile for the desktop. Same flake, different hardware config and configuration.nix. Use the same setup flow, targeting <code>#desktop</code>.</div>
+      <div class="profile-cmd">
+        <span class="snow">sudo nixos-rebuild switch</span> --flake ~/.lyonos<span class="snow">#desktop</span>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <span class="profile-icon">📦</span>
+      <div class="profile-name">ISO</div>
+      <div class="profile-sub">Virtual machines</div>
+      <div class="profile-desc">Stripped-down profile for VMs and ISO builds. Drive defaults to <code>/dev/vda</code>. Useful for testing config changes before applying to bare metal.</div>
+      <div class="profile-cmd">
+        <span class="snow">sudo nixos-rebuild switch</span> --flake ~/.lyonos<span class="snow">#iso</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMMANDS -->
+<section class="commands" id="commands">
+  <div class="section-eyebrow">Reference</div>
+  <h2 class="section-title">Common <em>Commands</em></h2>
+
+  <div class="cmd-grid">
+
+    <div class="cmd-card">
+      <div class="cmd-card-label snow">Rebuild</div>
+      <div class="cmd-line"><span class="cmd-dollar">$</span><span class="cmd-main">sudo nixos-rebuild</span>&nbsp;<span class="cmd-opt">switch</span>&nbsp;<span class="cmd-extra">--flake ~/.lyonos#workstation</span></div>
+      <div class="cmd-note">Applies immediately. Use <code>boot</code> to defer until reboot. <code>dry-run</code> evaluates without building. <code>test</code> switches without writing to boot menu.</div>
+    </div>
+
+    <div class="cmd-card">
+      <div class="cmd-card-label amber">Rollback</div>
+      <div class="cmd-line"><span class="cmd-dollar">$</span><span class="cmd-main">sudo nixos-rebuild</span>&nbsp;<span class="cmd-opt">switch</span>&nbsp;<span class="cmd-extra">--flake ~/.lyonos#workstation</span>&nbsp;<span style="color:var(--red)">--rollback</span></div>
+      <div class="cmd-note">Reverts to the previous generation. Generations accumulate until garbage collected.</div>
+    </div>
+
+    <div class="cmd-card">
+      <div class="cmd-card-label lime">Update</div>
+      <div class="cmd-line"><span class="cmd-dollar">$</span><span class="cmd-main">sudo nix flake update</span>&nbsp;<span class="cmd-extra">--flake ~/.lyonos#workstation</span></div>
+      <div class="cmd-note">Updates <code>flake.lock</code> to latest commits of all inputs. Rebuild after to apply.</div>
+    </div>
+
+    <div class="cmd-card">
+      <div class="cmd-card-label">Garbage collect</div>
+      <div class="cmd-line"><span class="cmd-dollar">$</span><span class="cmd-main">sudo nix-collect-garbage</span></div>
+      <div class="cmd-note">Deletes all old generations. <code>nh</code> auto-cleans generations older than 4 days, keeping 3. Run manually if running low on space.</div>
+    </div>
+
+    <div class="cmd-card">
+      <div class="cmd-card-label">Temp shell</div>
+      <div class="cmd-line"><span class="cmd-dollar">$</span><span class="cmd-main">nix-shell</span>&nbsp;<span class="cmd-opt">-p</span>&nbsp;<span class="cmd-sub">cowsay</span></div>
+      <div class="cmd-note">Installs software into a temporary shell. Discarded when the shell closes. No system changes.</div>
+    </div>
+
+    <div class="cmd-card">
+      <div class="cmd-card-label">Rebuild modes</div>
+      <div class="cmd-line"><span class="cmd-opt">switch</span>&nbsp;&nbsp;<span class="cmd-note" style="color:var(--text3); font-size:11px;">apply now</span></div>
+      <div class="cmd-line"><span class="cmd-opt">boot</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmd-note" style="color:var(--text3); font-size:11px;">apply on next reboot</span></div>
+      <div class="cmd-line"><span class="cmd-opt">dry-run</span>&nbsp;<span class="cmd-note" style="color:var(--text3); font-size:11px;">evaluate only</span></div>
+      <div class="cmd-line"><span class="cmd-opt">test</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="cmd-note" style="color:var(--text3); font-size:11px;">switch without writing bootloader</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- LINKS -->
+<div class="links-strip">
+  <a href="https://search.nixos.org/packages" target="_blank" class="link-card">
+    <div class="link-card-title">NixOS Packages</div>
+    <div class="link-card-desc">search.nixos.org/packages — find anything available in nixpkgs</div>
+  </a>
+  <a href="https://search.nixos.org/options" target="_blank" class="link-card">
+    <div class="link-card-title">NixOS Options</div>
+    <div class="link-card-desc">search.nixos.org/options — full reference for all NixOS module options</div>
+  </a>
+  <a href="https://home-manager-options.extranix.com/" target="_blank" class="link-card">
+    <div class="link-card-title">Home Manager Options</div>
+    <div class="link-card-desc">home-manager-options.extranix.com — user environment configuration reference</div>
+  </a>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">
+    <div class="wm">Lyon<span>OS</span></div>
+    <p>Personal NixOS flake. Laptop, desktop, and VM profiles. Declarative, reproducible, committed to git.</p>
+  </div>
+  <div class="footer-right">
+    <a href="https://github.com/ArcoNightshade/LyonOS-V2" target="_blank">GitHub ↗</a>
+    <a href="https://lyonos.dev">lyonos.dev</a>
+    <a href="https://lythos.lyonos.dev">lythos.lyonos.dev</a>
+  </div>
+</footer>
+<div class="footer-bottom">
+  <p>os.lyonos.dev — LyonOS V2</p>
+  <p>NixOS 25.11 · chaotic-nyx · home-manager · Limine</p>
+</div>
+
+<script>
+  // Custom cursor
+  const cur = document.getElementById('cursor');
+  const ring = document.getElementById('cursor-ring');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cur.style.left = mx + 'px'; cur.style.top = my + 'px';
+  });
+  (function animRing() {
+    rx += (mx - rx) * 0.13; ry += (my - ry) * 0.13;
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(animRing);
+  })();
+
+  // Hamburger
+  const btn = document.getElementById('hamburger');
+  const drawer = document.getElementById('navDrawer');
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('open'); drawer.classList.toggle('open');
+  });
+  drawer.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    btn.classList.remove('open'); drawer.classList.remove('open');
+  }));
+
+  // Copy buttons
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+        btn.textContent = 'copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+      });
+    });
+  });
+</script>
+</body>
+</html>
